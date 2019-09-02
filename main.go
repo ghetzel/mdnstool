@@ -16,7 +16,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = `mdnstool`
 	app.Usage = `utility for working with mDNS host discovery`
-	app.Version = `0.0.1`
+	app.Version = `0.0.2`
 	hostname, _ := os.Hostname()
 
 	app.Flags = []cli.Flag{
@@ -77,9 +77,14 @@ func main() {
 					Name:  `match-address, A`,
 					Usage: `A regular expression that mDNS service addresses must match`,
 				},
+				cli.StringFlag{
+					Name:  `dns-server, D`,
+					Usage: `If this flag is provided, mdnstool will start a DNS resolver that continuously discovers mDNS services and will serve DNS responses for those hosts.`,
+					Value: `:53`,
+				},
 			},
 			Action: func(c *cli.Context) {
-				if err := netutil.ZeroconfDiscover(&netutil.ZeroconfOptions{
+				opts := &netutil.ZeroconfOptions{
 					Limit:         c.Int(`limit`),
 					Timeout:       c.Duration(`timeout`),
 					Service:       c.String(`service`),
@@ -88,16 +93,24 @@ func main() {
 					MatchPort:     c.String(`match-port`),
 					MatchHostname: c.String(`match-hostname`),
 					MatchAddress:  c.String(`match-address`),
-				}, func(svc *netutil.Service) bool {
-					switch c.String(`format`) {
-					case `json`:
-						json.NewEncoder(os.Stdout).Encode(svc)
-					default:
-						fmt.Println(svc.String())
+				}
+
+				if c.IsSet(`dns-server`) {
+					log.FatalIf(
+						NewDNS(c.String(`dns-server`), opts).ListenAndServe(),
+					)
+				} else {
+					if err := netutil.ZeroconfDiscover(opts, func(svc *netutil.Service) bool {
+						switch c.String(`format`) {
+						case `json`:
+							json.NewEncoder(os.Stdout).Encode(svc)
+						default:
+							fmt.Println(svc.String())
+						}
+						return true
+					}); err != nil {
+						log.Fatalf("discovery error: %v", err)
 					}
-					return true
-				}); err != nil {
-					log.Fatalf("discovery error: %v", err)
 				}
 			},
 		}, {

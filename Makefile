@@ -27,4 +27,6 @@ $(GEESE):
 	GOOS=$(firstword $(subst -, ,$(@))) GOARCH=$(lastword $(subst -, ,$(@))) go build --ldflags '-extldflags "-static"' -installsuffix cgo -ldflags '-s' -o bin/mdnstool-$(@) ./
 
 build: fmt $(GEESE)
-	which mdnstool && cp -v bin/mdnstool $(shell which mdnstool) || cp -v bin/mdnstool ~/bin/
+
+release:
+	hub release create $(ls -1 bin/*-*-* | xargs -I{} echo "-a bin/{}") $(VERSION)
