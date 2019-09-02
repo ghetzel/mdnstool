@@ -29,4 +29,4 @@ $(GEESE):
 build: fmt $(GEESE)
 
 release:
-	hub release create $(ls -1 bin/*-*-* | xargs -I{} echo "-a bin/{}") $(VERSION)
+	hub release create $(ls -1 bin/*-*-* | xargs -I{} echo "-a {}") $(VERSION)
