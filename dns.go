@@ -111,6 +111,7 @@ func (self *DNS) ListenAndServe() error {
 			}
 		}()
 
+		log.Infof("[dns] Starting DNS server at %s", self.server.Addr)
 		return self.server.ListenAndServe()
 	} else {
 		return fmt.Errorf("No mDNS configuration provided")
@@ -134,7 +135,7 @@ func (self *DNS) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		domain = q.Name
 
 		switch qtype := q.Qtype; qtype {
-		case dns.TypeA, dns.TypeSRV:
+		case dns.TypeA, dns.TypeAAAA, dns.TypeSRV:
 			break
 		default:
 			dns.HandleFailed(w, req)
@@ -152,17 +153,17 @@ func (self *DNS) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				msg.Authoritative = true
 
 				for _, addr := range svc.Addresses {
+					var answer dns.RR
+
+					hdr := dns.RR_Header{
+						Name:   dk(domain),
+						Rrtype: q.Qtype,
+						Class:  dns.ClassINET,
+						Ttl:    uint32(self.TTL.Round(time.Second).Seconds()),
+					}
+
 					// reply with the first routable IP the service published
 					if ipv4 := netutil.IsRoutableIP(`ip4`, addr); ipv4 != nil {
-						var answer dns.RR
-
-						hdr := dns.RR_Header{
-							Name:   dk(domain),
-							Rrtype: q.Qtype,
-							Class:  dns.ClassINET,
-							Ttl:    uint32(self.TTL.Round(time.Second).Seconds()),
-						}
-
 						switch q.Qtype {
 						case dns.TypeA:
 							answer = &dns.A{
@@ -178,11 +179,19 @@ func (self *DNS) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 								Hdr:      hdr,
 							}
 						}
-
-						if answer != nil {
-							msg.Answer = append(msg.Answer, answer)
-							break
+					} else if ipv6 := netutil.IsRoutableIP(`ip6`, addr); ipv6 != nil {
+						switch q.Qtype {
+						case dns.TypeAAAA:
+							answer = &dns.AAAA{
+								AAAA: ipv6,
+								Hdr:  hdr,
+							}
 						}
+					}
+
+					if answer != nil {
+						msg.Answer = append(msg.Answer, answer)
+						break
 					}
 				}
 			}
