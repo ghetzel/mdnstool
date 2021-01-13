@@ -16,7 +16,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = `mdnstool`
 	app.Usage = `utility for working with mDNS host discovery`
-	app.Version = `0.0.3`
+	app.Version = `0.0.4`
 	hostname, _ := os.Hostname()
 
 	app.Flags = []cli.Flag{
